@@ -48,7 +48,7 @@ def prepareTrainingData(directory,recordName):
                 subGT_ = imgGT[y:y+PATCH_SIZE,x:x+PATCH_SIZE]
                 subX_ = cv.resize(subGT_, (int(PATCH_SIZE / SCALE), (int(PATCH_SIZE / SCALE))),interpolation=cv.INTER_CUBIC)
                 subX_ = cv.resize(subX_, (int(PATCH_SIZE), int(PATCH_SIZE)),interpolation=cv.INTER_CUBIC)
-                ###
+                ###$$$
                 subGT_[:,:] = 0.0
                 ###
                 # 是否进行数据 augmentation
