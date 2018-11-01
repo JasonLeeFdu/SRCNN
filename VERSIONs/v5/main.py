@@ -38,9 +38,9 @@ TEST_DATA_PATH = 'Data/dataset/testingSet/'
 TRAIN_RECORD_NAME = 'train.tfrecords'
 VAL_RECORD_NAME = 'val.tfrecords'
 TEST_RECORD_NAME = 'test.tfrecords'
-PRINT_INTERVAL = 10
-SUMMARY_INTERVAL = 10
-SAVE_INTERVAL = 10
+PRINT_INTERVAL = 50
+SUMMARY_INTERVAL = 20
+SAVE_INTERVAL = 200
 MODEL_DIR = 'Data/model/'
 SCALE = 2
 
