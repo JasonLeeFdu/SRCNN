@@ -243,7 +243,10 @@ def train():
 
         for iter1 in np.arange(start_it, ITER_NUM + 1):
             startTime = time.time()  # 统计
+
             a,b,summary,_,lossData = sess.run([inputTensor, labelTensor,mergedSummOpt,trainOpts, loss])              #训练，注意sess.run 的第一个参数是一个fetch list
+
+
             endTime = time.time()
             AvgFreq += endTime - startTime
             Avgloss += lossData
@@ -272,7 +275,7 @@ if __name__ == '__main__':
 
 
 
-
+#  TF:             https://github.com/tensorflow/tensorboard/blob/master/README.md
 # https://blog.csdn.net/index20001/article/details/74322198
 # https://blog.csdn.net/ying86615791/article/details/76215363 进阶使用
 # https://blog.csdn.net/daniaokuye/article/details/78699138
