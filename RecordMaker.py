@@ -50,6 +50,7 @@ def prepareTrainingData(directory,recordName):
                 subX_ = cv.resize(subX_, (int(PATCH_SIZE), int(PATCH_SIZE)),interpolation=cv.INTER_CUBIC)
                 ###$$$
                 subGT_[:,:] = 0.0
+                subX_ [:,:]= 1.0
                 ###
                 # 是否进行数据 augmentation
                 if AUG:
@@ -126,11 +127,11 @@ def readAndDecode(fileName):
     features = tf.parse_single_example(                         # 序列化的示例数据(训练数据单元).解析为一个含有很多数据项的feature字典{x1:,x2:,...y1:,y2:...}
         serializedExample,
         features={                                              #   解析目标说明
-            'label':tf.FixedLenFeature([],tf.string),
+            'label':tf.FixedLenFeature([],tf.string),           ###$$$  千万注意要要对等tf.string -- tobytes  tostring
             'input':tf.FixedLenFeature([],tf.string)
         }
     )
-    labelImg = tf.decode_raw(features['label'],tf.float32)
+    labelImg = tf.decode_raw(features['label'],tf.float32)       ###$$$  千万注意要要对等tf.string -- tobytes  tostring
     labelImg = tf.reshape(labelImg,[32,32,1])
     inputImg = tf.decode_raw(features['input'], tf.float32)     # 从生字符串进行解析序列,然后变形图片.生成的 tensor 借口
     inputImg = tf.reshape(inputImg,[32,32,1])
