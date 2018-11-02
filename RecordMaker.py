@@ -111,13 +111,7 @@ def readAndDecode(fileName):
             'input':tf.FixedLenFeature([],tf.string)
         }
     )
-<<<<<<< HEAD
-
-
     labelImg = tf.decode_raw(features['label'],tf.float32)
-=======
-    labelImg = tf.decode_raw(features['label'],tf.float32)       ###$$$  千万注意要要对等tf.string -- tobytes  tostring
->>>>>>> d3b30f2f2936293534b185b6e535aa079c0053f9
     labelImg = tf.reshape(labelImg,[32,32,1])
     inputImg = tf.decode_raw(features['input'], tf.float32)     # 从生字符串进行解析序列,然后变形图片.生成的 tensor 借口
     inputImg = tf.reshape(inputImg,[32,32,1])
