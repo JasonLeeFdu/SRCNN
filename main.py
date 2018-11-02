@@ -21,12 +21,14 @@ v5 中期版本
 网络结果测试函数
 去掉绝对路径 不是./ 而直接是 Data/...  可用os.getcwd()
 更正三通道为Y单通道，另PSNR也是单通道；更正为不除255
-tensorboard支持
+tensorboard支持  
+实验室是scipy来做resize
+
 '''
 
 
 # hyper parameter
-BATCH_NUM = 7200
+BATCH_NUM = 72
 ITER_NUM = 800000
 LR1       = 1e-5
 LR2       = 1e-6
@@ -38,9 +40,9 @@ TEST_DATA_PATH = 'Data/dataset/testingSet/'
 TRAIN_RECORD_NAME = 'train.tfrecords'
 VAL_RECORD_NAME = 'val.tfrecords'
 TEST_RECORD_NAME = 'test.tfrecords'
-PRINT_INTERVAL = 10
-SUMMARY_INTERVAL = 10
-SAVE_INTERVAL = 10
+PRINT_INTERVAL = 50
+SUMMARY_INTERVAL = 50
+SAVE_INTERVAL = 50
 MODEL_DIR = 'Data/model/'
 SCALE = 2
 
@@ -66,6 +68,7 @@ def test():
         if flag:
             oriImg = oriImg[0:imgHeight,0:imgWidth,:]
 
+        ###！！
         lrImg = cv.resize(oriImg, (int(imgWidth / SCALE), (int(imgHeight / SCALE))), interpolation=cv.INTER_CUBIC)
         lrImg = cv.resize(lrImg, (int(imgWidth), int(imgHeight)), interpolation=cv.INTER_CUBIC)
 
@@ -187,28 +190,29 @@ def train():
         ## 初始化网络及其超参数                                                                                            | 不用写 inputImg = tf.placeholder(tf.float32,shape=[None,None,None,3],name='inputImage') 和 labelImg = tf.placeholder(tf.float32,shape=[None,None,None,3],name='labelImage')
         globalStep = tf.Variable(0, trainable=False)
         pred, loss = ops.network(inputBatchTensor, labelBatchTensor)
-        '''
+
         learning_rate = tf.train.exponential_decay(LR1, globalStep, ITER_NUM / 10, 0.1, staircase=True)
-        trainOpts = tf.train.GradientDescentOptimizer(LR1).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
-        #trainOpts = tf.train.AdamOptimizer(learning_rate).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
+        #trainOpts = tf.train.GradientDescentOptimizer(LR1).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
+        trainOpts = tf.train.AdamOptimizer(learning_rate).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
         
-        variables_names = [v.name for v in tf.trainable_variables()]
+        #variables_names = [v.name for v in tf.trainable_variables()]
+        '''
         for k in variables_names:
             print("Variable: ", k) 
         tf.gradients()
         '''
         ## 根据不同的网络层，调整学习率
-        varSet = tf.trainable_variables()                           # 获得所有的训练参数
-        varList1 = varSet[0:4]  # 正常的学习率的参数
-        varList2 = varSet[4:]  # 改变的学习率的参数
-        opt1 = tf.train.AdamOptimizer(LR1)  # 正常的学习率
-        opt2 = tf.train.AdamOptimizer(LR2)  # 改变的学习率
-        grads = tf.gradients(loss, varList1 + varList2)  # 计算梯度
-        grads1 = grads[:len(varList1)]  # 梯度更新表的前半部分
-        grads2 = grads[len(varList1):]  # 梯度更新表的后半部分
-        train_op1 = opt1.apply_gradients(zip(grads1, varList1))  # 利用优化器将梯度更新到变量，优化器1
-        train_op2 = opt2.apply_gradients(zip(grads2, varList2))  # 利用优化器将梯度更新到变量，优化器2
-        trainOpts = tf.group(train_op1, train_op2)
+        #varSet = tf.trainable_variables()                           # 获得所有的训练参数
+        #varList1 = varSet[0:4]  # 正常的学习率的参数
+        #varList2 = varSet[4:]  # 改变的学习率的参数
+        #opt1 = tf.train.AdamOptimizer(LR1)  # 正常的学习率
+        #opt2 = tf.train.AdamOptimizer(LR2)  # 改变的学习率
+        #grads = tf.gradients(loss, varList1 + varList2)  # 计算梯度
+        #grads1 = grads[:len(varList1)]  # 梯度更新表的前半部分
+        #grads2 = grads[len(varList1):]  # 梯度更新表的后半部分
+        #train_op1 = opt1.apply_gradients(zip(grads1, varList1))  # 利用优化器将梯度更新到变量，优化器1
+        #train_op2 = opt2.apply_gradients(zip(grads2, varList2))  # 利用优化器将梯度更新到变量，优化器2
+        #trainOpts = tf.group(train_op1, train_op2)
 
         ## 初始化全局变量,初始化文件队列的读取
         tf.global_variables_initializer().run()
@@ -239,7 +243,7 @@ def train():
 
         for iter1 in np.arange(start_it, ITER_NUM + 1):
             startTime = time.time()  # 统计
-            summary,_,lossData = sess.run([mergedSummOpt,trainOpts, loss])              #训练，注意sess.run 的第一个参数是一个fetch list
+            a,b,summary,_,lossData = sess.run([inputTensor, labelTensor,mergedSummOpt,trainOpts, loss])              #训练，注意sess.run 的第一个参数是一个fetch list
             endTime = time.time()
             AvgFreq += endTime - startTime
             Avgloss += lossData
@@ -261,8 +265,6 @@ def train():
                 #test()
                 saver.save(sess, MODEL_DIR + 'model.ckpt', global_step=iter1)
                 print(' ... Iter %d model saved! '%iter1)
-
-
 
 if __name__ == '__main__':
         main()

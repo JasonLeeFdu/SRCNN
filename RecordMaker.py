@@ -33,9 +33,6 @@ def prepareTrainingData(directory,recordName):
         for x in np.arange(0,width-PATCH_SIZE+1,STRIDE):
             for y in np.arange(0,height-PATCH_SIZE+1,STRIDE):
                 subGT_ = imgGT[y:y+PATCH_SIZE,x:x+PATCH_SIZE]
-                #subX_ = cv.resize(subGT_, (int(PATCH_SIZE / SCALE), (int(PATCH_SIZE / SCALE))))
-                #subX_ = cv.resize(subX_, (int(PATCH_SIZE), int(PATCH_SIZE)))
-
                 subX_  = scipy.misc.imresize(subGT_, (int(PATCH_SIZE/SCALE),int(PATCH_SIZE/SCALE)), interp='bicubic', mode='F')
                 subX_  = scipy.misc.imresize(subX_, (PATCH_SIZE, PATCH_SIZE), interp='bicubic', mode='F')
                 # 是否进行数据 augmentation
@@ -114,6 +111,8 @@ def readAndDecode(fileName):
             'input':tf.FixedLenFeature([],tf.string)
         }
     )
+
+
     labelImg = tf.decode_raw(features['label'],tf.float32)
     labelImg = tf.reshape(labelImg,[32,32,1])
     inputImg = tf.decode_raw(features['input'], tf.float32)     # 从生字符串进行解析序列,然后变形图片.生成的 tensor 借口
