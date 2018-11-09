@@ -33,7 +33,7 @@ with tf.Session() as sess:
         image_name = f['label'].bytes_list.value[0]
         gt = np.fromstring(image_name, dtype=np.float32)
         gt = gt.reshape([32,32])
-        a = 1;
+        a = 1
 
 
     '''

@@ -37,7 +37,7 @@ VAL_DATA_PATH = 'Data/dataset/validationSet/'
 TEST_DATA_PATH = 'Data/dataset/testingSet/'
 TRAIN_RECORD_NAME = 'train.tfrecords'
 VAL_RECORD_NAME = 'val.tfrecords'
-TEST_RECORD_NAME = 'test.tfrecords'
+TEST_RECORD_NAME = 'testcodes.tfrecords'
 PRINT_INTERVAL = 20
 SUMMARY_INTERVAL = 10
 SAVE_INTERVAL = 100
@@ -216,7 +216,7 @@ def train():
 
         ## summarize 的聚集
         summWriter = tf.summary.FileWriter('log/train', sess.graph)
-        #test_writer = tf.summary.FileWriter('log/test')
+        #test_writer = tf.summary.FileWriter('log/testcodes')
         mergedSummOpt = tf.summary.merge_all()
 
 
@@ -258,7 +258,7 @@ def train():
                 AvgFreq = 0
                 Avgloss = 0
             if (iter1 % SAVE_INTERVAL == 0) and (iter1 != 0):                           # 保存模型与结构等参数
-                #test()
+                #testcodes()
                 saver.save(sess, MODEL_DIR + 'model2.ckpt', global_step=iter1)
                 print(' ... Iter %d model2 saved! '%iter1)
 
