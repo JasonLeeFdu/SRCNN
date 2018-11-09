@@ -35,7 +35,7 @@ DATA_PATH = '/home/winston/PycharmProjects/SRCNN_TF_REBUILD/Data/singlImg/'
 RECORD_NAME = 'training.tfrecords'
 PRINT_INTERVAL = 20
 SAVE_INTERVAL = 20
-MODEL_DIR = '/home/winston/PycharmProjects/SRCNN_TF_REBUILD/Data/model/'
+MODEL_DIR = '/home/winston/PycharmProjects/SRCNN_TF_REBUILD/Data/model2/'
 
 
 def main():
@@ -80,7 +80,7 @@ def train():
             print('Continue training at Iter %d' % start_it)
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
-            print('No training model found, start from iter 1')
+            print('No training model2 found, start from iter 1')
 
         ## 进行训练
         ## 训练运行状态参数
@@ -95,7 +95,7 @@ def train():
             Avgloss += lossData
 
             if (iter1 % SAVE_INTERVAL == 0) and (iter1 != 0):  # 保存模型与结构等参数
-                saver.save(sess, MODEL_DIR + 'model.ckpt', global_step=globalStep)
+                saver.save(sess, MODEL_DIR + 'model2.ckpt', global_step=globalStep)
 
             if (iter1 % PRINT_INTERVAL == 0) and (iter1 != 0):  # 显示
                 AvgFreq = (PRINT_INTERVAL * BATCH_NUM) / AvgFreq

@@ -41,7 +41,7 @@ TEST_RECORD_NAME = 'test.tfrecords'
 PRINT_INTERVAL = 20
 SUMMARY_INTERVAL = 10
 SAVE_INTERVAL = 100
-MODEL_DIR = 'Data/model/'
+MODEL_DIR = 'Data/model2/'
 SCALE = 2
 
 def main():
@@ -51,7 +51,7 @@ def main():
 def test():
     '''测试函数'''
     FLAG_SINGLE_TEST = False
-    MODEL_NAME = 'model.ckpt-87300'
+    MODEL_NAME = 'model2.ckpt-87300'
     if FLAG_SINGLE_TEST:
         oriImg = cv.imread('Data/dataset/validationSet/woman_GT.bmp')
         imgHeight = oriImg.shape[0]
@@ -230,7 +230,7 @@ def train():
             print('Continue training at Iter %d' % start_it)
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
-            print('No training model found, start from iter 1')
+            print('No training model2 found, start from iter 1')
 
         ## 进行训练
         # 训练运行状态参数
@@ -259,8 +259,8 @@ def train():
                 Avgloss = 0
             if (iter1 % SAVE_INTERVAL == 0) and (iter1 != 0):                           # 保存模型与结构等参数
                 #test()
-                saver.save(sess, MODEL_DIR + 'model.ckpt', global_step=iter1)
-                print(' ... Iter %d model saved! '%iter1)
+                saver.save(sess, MODEL_DIR + 'model2.ckpt', global_step=iter1)
+                print(' ... Iter %d model2 saved! '%iter1)
 
 
 
