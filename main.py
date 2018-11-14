@@ -1,6 +1,5 @@
 import tensorflow as tf
 import LjchOpts as ops
-
 import RecordMaker as rec
 import os
 import time
@@ -10,7 +9,7 @@ import math
 import cv2 as cv
 import tools
 import scipy
-from PIL import Image
+
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -23,32 +22,19 @@ v5 中期版本
 数据augmentation 的文件
 网络结果测试函数
 去掉绝对路径 不是./ 而直接是 Data/...  可用os.getcwd()
-更正三通道为Y单通道，另PSNR也是单通道；更正为除255
-tensorboard支持
-batch size 的理性修改,使得梯度修正回传次数达到相应的次数
-'''
-'''
-注意:
-1.PIL的缩小放大,有锯齿现象
-2. 效果: opencv > scipy.misc.imresize
-3.tf.placeholder_with_default
-4.
-'''
-'''
-炼丹总结:
-1. 一开始也不必batch_size太小,否则带向一个大凹面,收敛效果后期不好
-2. 一开始比较大的batch_size, 之后再升高batch_size,减小lr
-3. 但是batchsize 也不能太大
+更正三通道为Y单通道，另PSNR也是单通道；更正为不除255
+tensorboard支持  
+实验室是scipy来做resize
+
 '''
 
-# hyper parameter  41800
-BATCH_NUM = 350
-LR1       = 1e-3
-LR2       = 1e-4
-stage1    = 2 * 100000000
-stage2    = 3 * 100000000
-stage3    = 4 * 100000000
-ITER_NUM  = 10 * 100000000
+
+# hyper parameter
+BATCH_NUM = 128
+ITER_NUM = 600000000
+
+LR1       = 1e-4
+LR2       = 1e-5
 
 
 # configuration
@@ -57,34 +43,107 @@ VAL_DATA_PATH = 'Data/dataset/validationSet/'
 TEST_DATA_PATH = 'Data/dataset/testingSet/'
 TRAIN_RECORD_NAME = 'train.tfrecords'
 VAL_RECORD_NAME = 'val.tfrecords'
-TEST_RECORD_NAME = 'test.tfrecords'
-PRINT_INTERVAL = 50
-SUMMARY_INTERVAL = 50
-SAVE_INTERVAL = 500
-VALIDATE_INTERVAL = 10000
-LR_STAIR_WIDTH = 100000000000
-LR_STAIR_DECAY = 1
-MODEL_DIR = 'Data/model/'
-SCALE = 4
+TEST_RECORD_NAME = 'testcodes.tfrecords'
+PRINT_INTERVAL = 200
+SUMMARY_INTERVAL = 200
+SAVE_INTERVAL = 200
+MODEL_DIR = 'Data/model2/'
+SCALE = 2
+MODEL_NAME = 'model2.ckpt-2500000'
 
 def main():
     train()
 
 
-def loadValData():
-    fileList = os.listdir(TEST_DATA_PATH)
-    valList  = list()
-    for img_name in fileList:
-        oriImg = cv.imread(TEST_DATA_PATH + img_name)
-        valList.append(oriImg)
-    return valList
+def testImg(img):
+
+    # read in by opencv
+    h = img.shape[0]
+    w = img.shape[1]
+    # img => YCbCr
+    imgYUV =  cv.cvtColor(img,cv.COLOR_BGR2YCR_CB)
+    # get blurY
+    oriImgY = imgYUV[:,:,0]
+    oriImgU = imgYUV[:,:,1]
+    oriImgV = imgYUV[:,:,2]
+
+    blur_Y = oriImgY.astype(np.float32)
+    blur_Y /= 255
+    blur_Y = scipy.misc.imresize(blur_Y, (int(h / SCALE), int(w/ SCALE)), interp='bicubic', mode='F')
+    blur_Y = scipy.misc.imresize(blur_Y, (h , w), interp='bicubic', mode='F')
+    blurY = blur_Y * 255
+    blurY = blurY.astype(np.uint8)
+
+    # get the predY
+    ## set & load net
+    sess = tf.Session()
+    with sess.as_default():
+        inputTnsr = tf.placeholder(dtype=tf.float32, shape=[1,None, None,1]) #careful of batchsize and channel
+        labelTnsr = tf.placeholder(dtype=tf.float32, shape=[1,None, None,1])
+        resTnsr, lossTnsr = ops.network(inputTnsr, labelTnsr)
+        # 不必初始化,而是采用之前训练好的参数
+        saver = tf.train.Saver()
+        saver.restore(sess, MODEL_DIR + MODEL_NAME)
+        ## prediction to get predY
+        blur_Y = blur_Y.reshape([1,h,w,1])
+        resImgY = resTnsr.eval(feed_dict={inputTnsr: blur_Y})
+        predY = resImgY * 255
+        predY = predY.astype(np.uint8)
+        predY = predY.reshape([h,w])
+        ## calculate psnr
+        PSNRMine = tools.PSNR(oriImgY,predY)
+        PSNRBic  = tools.PSNR(oriImgY,blurY)
+        ## get blurImg and predImg
+        blurImg = np.concatenate([blurY.reshape([h,w,1]),oriImgU.reshape([h,w,1]),oriImgV.reshape([h,w,1])],axis=2)
+        predImg = np.concatenate([predY.reshape([h,w,1]),oriImgU.reshape([h,w,1]),oriImgV.reshape([h,w,1])],axis=2)
+        blurImg = cv.cvtColor(blurImg,cv.COLOR_YCR_CB2BGR)
+        predImg = cv.cvtColor(predImg,cv.COLOR_YCR_CB2BGR)
+        # demo OriImg blurImg & predImg, print psnr
+        cv.imshow('Original Image',img)
+        cv.imshow('Bic Image',blurImg)
+        cv.imshow('Pred Image',predImg)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+        print(PSNRMine)
+        print(PSNRBic)
 
 
-def test():
+
+def mkDatasetTFR(dsName = 'Set14'):
+    tfrFileName = dsName + '_test.tfrecord'
+    dsPath = os.path.join('./Data/dataset/',dsName)
+    writer = tf.python_io.TFRecordWriter(tfrFileName)
+    if os.path.exists(tfrFileName):
+        return
+    for elem in imgList:
+        # read in
+        img = cv.imread(os.path.join(dsPath, elem))
+        w = img.shape[1]
+        h = img.shape[0]
+        img = cv.cvtColor(img, cv.COLOR_BGR2YCR_CB)
+        imgY = img[:, :, 0]
+        # reg Y and blur Y
+        blur_Y = scipy.misc.imresize(imgY, (h / SCALE, w/ SCALE), interp='bicubic', mode='F')
+        blur_Y = scipy.misc.imresize(blur_Y, (h , w), interp='bicubic', mode='F')
+        # input label are written to tfr
+        imgY = imgY.astype(np.float32)
+        blur_Y = blur_Y.astype(np.float32)
+        imgY = imgY / 255
+        blur_Y = blur_Y / 255
+        imgY_raw = imgY.tobytes()
+        blur_Y_raw = blur_Y.tobytes()
+        sample = tf.train.Example(features=tf.train.Features(feature={
+            "label": tf.train.Feature(bytes_list=tf.train.BytesList(value=[imgY_raw])),
+            'input': tf.train.Feature(bytes_list=tf.train.BytesList(value=[blur_Y_raw]))
+        }))
+        writer.write(sample.SerializeToString())
+    writer.close()
+    # end
+
+
+def test_Old():
     '''测试函数'''
     FLAG_SINGLE_TEST = False
-    MODEL_DIR = 'success3/model/'
-    MODEL_NAME = 'model.ckpt-47500'
     if FLAG_SINGLE_TEST:
         oriImg = cv.imread('Data/dataset/validationSet/woman_GT.bmp')
         imgHeight = oriImg.shape[0]
@@ -99,6 +158,7 @@ def test():
         if flag:
             oriImg = oriImg[0:imgHeight,0:imgWidth,:]
 
+        ###！！
         lrImg = cv.resize(oriImg, (int(imgWidth / SCALE), (int(imgHeight / SCALE))), interpolation=cv.INTER_CUBIC)
         lrImg = cv.resize(lrImg, (int(imgWidth), int(imgHeight)), interpolation=cv.INTER_CUBIC)
 
@@ -108,14 +168,14 @@ def test():
         lrY = lrYUV[:, :, 0]
         # 输入预处理
         lrY = np.reshape(lrY,(1,imgHeight,imgWidth,1)) #reshape 于行列无关
+        #lrImgs = lrImgs/ 255
         lrY = lrY.astype(np.float32)
-        lrY = lrY/ 255
         sess = tf.Session()
         with sess.as_default():
             # 重新构建网络结构
             inputTnsr = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 1])
             labelTnsr = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 1])
-            resTnsr,lossTnsr,_ = ops.network(inputTnsr,labelTnsr)
+            resTnsr,lossTnsr = ops.network(inputTnsr,labelTnsr)
             # 不必初始化,而是采用之前训练好的参数
             saver = tf.train.Saver()
             saver.restore(sess,MODEL_DIR+MODEL_NAME)
@@ -125,7 +185,7 @@ def test():
             resImgY = np.reshape(resImgY,(imgHeight,imgWidth,1))
             lrY = np.reshape(lrY, (imgHeight,imgWidth, 1))
             oriY= np.reshape(oriY, (imgHeight,imgWidth,  1))
-            resImgY = resImgY * 255
+            #resImg = resImg * 255
             resImgY = resImgY.astype(np.uint8)
             lrY = lrY.astype(np.uint8)
             # 计算 PSNR
@@ -145,7 +205,8 @@ def test():
             cv.destroyAllWindows()
         sess.close()
     else:
-        fileList = os.listdir(TEST_DATA_PATH)
+        imgDir = 'Data/dataset/validationSet/'
+        fileList = os.listdir(imgDir)
         avgPSNR = 0.0
         sess = tf.Session()
         counter =0
@@ -153,14 +214,13 @@ def test():
             # 重新构建网络结构
             inputTnsr = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 1])
             labelTnsr = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 1])
-            resTnsr, lossTnsr,_ = ops.network(inputTnsr, labelTnsr)
+            resTnsr, lossTnsr = ops.network(inputTnsr, labelTnsr)
             # 不必初始化,而是采用之前训练好的参数
             saver = tf.train.Saver()
             saver.restore(sess, MODEL_DIR + MODEL_NAME)
             for img_name in fileList:
                 # 读入并矫正(mod crop)
                 oriImg = cv.imread(imgDir+img_name)
-                oriYUV = cv.cvtColor(oriImg, cv.COLOR_BGR2YCR_CB)
                 imgHeight = oriImg.shape[0]
                 imgWidth = oriImg.shape[1]
                 flag = False
@@ -171,17 +231,13 @@ def test():
                     imgWidth -= 1
                     flag = True
                 if flag:
-                    oriYUV = oriYUV[0:imgHeight, 0:imgWidth, :]
-                oriY = oriYUV[:, :, 0]
-
-                lrY = cv.resize(oriY, (int(imgWidth / SCALE), (int(imgHeight / SCALE))),interpolation=cv.INTER_CUBIC)   #33.0758
-
-                lrY = cv.resize(lrY, (int(imgWidth), int(imgHeight)), interpolation=cv.INTER_CUBIC)
-
-                #lrY = scipy.misc.imresize(oriY, (int(imgHeight / SCALE), int(imgWidth / SCALE)), interp='bicubic',mode='F')#32.1587
-
-                #lrY = scipy.misc.imresize(lrY, (int(imgHeight), int(imgWidth)), interp='bicubic', mode='F')
-
+                    oriImg = oriImg[0:imgHeight, 0:imgWidth, :]
+                lrImg = cv.resize(oriImg,(int(imgWidth / SCALE),(int(imgHeight / SCALE))),interpolation=cv.INTER_CUBIC)
+                lrImg = cv.resize(lrImg, (int(imgWidth), int(imgHeight)), interpolation=cv.INTER_CUBIC)
+                lrYUV = cv.cvtColor(lrImg, cv.COLOR_BGR2YCR_CB)
+                oriYUV = cv.cvtColor(oriImg, cv.COLOR_BGR2YCR_CB)
+                oriY  = oriYUV[:,:,0]
+                lrY   = lrYUV[:,:,0]
                 # 输入预处理
                 lrY = np.reshape(lrY, (1, imgHeight, imgWidth, 1))  # reshape 于行列无关
                 lrY = lrY.astype(np.float32)
@@ -204,6 +260,11 @@ def test():
             avgPSNR /= len(fileList)
             print('该数据集上PSNR平均值为：%.4f'%avgPSNR)
 
+def test():
+    oriImg = cv.imread('./Data/dataset/Set14/barbara.bmp')
+    testImg(oriImg)
+
+
 
 def train():
     # 预处理
@@ -213,63 +274,53 @@ def train():
     if not os.path.exists(MODEL_DIR):
         os.mkdir(MODEL_DIR)
 
-    valSet = loadValData()
-
     with tf.Session() as sess:
         ## 初始化文件队列数据借口
         inputTensor, labelTensor = rec.readAndDecode(TRAIN_RECORD_NAME)
         inputBatchTensor, labelBatchTensor = tf.train.shuffle_batch([inputTensor, labelTensor], batch_size=BATCH_NUM,
-                                                                    capacity=10000,
-                                                                    min_after_dequeue=1500)
+                                                                    capacity=1400,
+                                                                    min_after_dequeue=500)
         tf.summary.image('inputImg',inputBatchTensor)
         tf.summary.image('labelImg',labelBatchTensor)
         ## 初始化网络及其超参数                                                                                            | 不用写 inputImg = tf.placeholder(tf.float32,shape=[None,None,None,3],name='inputImage') 和 labelImg = tf.placeholder(tf.float32,shape=[None,None,None,3],name='labelImage')
         globalStep = tf.Variable(0, trainable=False)
+        pred, loss = ops.network(inputBatchTensor, labelBatchTensor)
 
-        inputHolder = tf.placeholder_with_default(inputBatchTensor, shape=[None,None,None,None])
-        labelHolder = tf.placeholder_with_default(labelBatchTensor, shape=[None,None,None,None])
-        pred, loss = ops.network(inputHolder, labelHolder)
-
-        learning_rate1 = tf.train.exponential_decay(LR1, globalStep, LR_STAIR_WIDTH, LR_STAIR_DECAY,staircase=True)  # learning_rate：0.1；staircase=True;则每100轮训练后要乘以0.96.
-        learning_rate2 = tf.train.exponential_decay(LR2, globalStep, LR_STAIR_WIDTH, LR_STAIR_DECAY, staircase=True)  #learning_rate：0.1；staircase=True;则每100轮训练后要乘以0.96.
-
-
-        trainOpts = tf.train.AdamOptimizer(LR1).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
-        #trainOpts = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
+        #learning_rate = tf.train.exponential_decay(LR1, globalStep, ITER_NUM / 10, 0.1, staircase=True)
+        #trainOpts = tf.train.GradientDescentOptimizer(LR1).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
+        #trainOpts = tf.train.AdamOptimizer(learning_rate).minimize(loss,global_step=globalStep)  # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False, name=None)
+        
+        #variables_names = [v.name for v in tf.trainable_variables()]
         '''
-        variables_names = [v.name for v in tf.trainable_variables()]
         for k in variables_names:
             print("Variable: ", k) 
         tf.gradients()
         '''
-
-        '''
         ## 根据不同的网络层，调整学习率
-        varSet = tf.trainable_variables()                               # 获得所有的训练参数
-        varList1 = varSet[0:4]                                          # 正常的学习率的参数
-        varList2 = varSet[4:]                                           # 改变的学习率的参数
-        opt1 = tf.train.AdamOptimizer(learning_rate1)                   # 正常的学习率
-        opt2 = tf.train.AdamOptimizer(learning_rate2)                   # 改变的学习率
-        grads = tf.gradients(loss, varList1 + varList2)                 # 计算梯度
-        grads1 = grads[:len(varList1)]                                  # 梯度更新表的前半部分
-        grads2 = grads[len(varList1):]                                  # 梯度更新表的后半部分
-        train_op1 = opt1.apply_gradients(zip(grads1, varList1))         # 利用优化器将梯度更新到变量，优化器1
-        train_op2 = opt2.apply_gradients(zip(grads2, varList2))         # 利用优化器将梯度更新到变量，优化器2
+        varSet = tf.trainable_variables()                           # 获得所有的训练参数
+        varList1 = varSet[0:4]  # 正常的学习率的参数
+        varList2 = varSet[4:]  # 改变的学习率的参数
+        opt1 = tf.train.GradientDescentOptimizer(LR1)  # 正常的学习率
+        opt2 = tf.train.GradientDescentOptimizer(LR2)  # 改变的学习率
+        grads = tf.gradients(loss, varList1 + varList2)  # 计算梯度
+        grads1 = grads[:len(varList1)]  # 梯度更新表的前半部分
+        grads2 = grads[len(varList1):]  # 梯度更新表的后半部分
+        train_op1 = opt1.apply_gradients(zip(grads1, varList1))  # 利用优化器将梯度更新到变量，优化器1
+        train_op2 = opt2.apply_gradients(zip(grads2, varList2))  # 利用优化器将梯度更新到变量，优化器2
         trainOpts = tf.group(train_op1, train_op2)
-        increment_op = tf.assign_add(globalStep, tf.constant(1))
-                '''
 
         ## 初始化全局变量,初始化文件队列的读取
         tf.global_variables_initializer().run()
         tf.train.start_queue_runners(sess=sess)
+
         ## summarize 的聚集
         summWriter = tf.summary.FileWriter('log/train', sess.graph)
-        #testWriter = tf.summary.FileWriter('log/test', sess.graph)
+        #test_writer = tf.summary.FileWriter('log/testcodes')
         mergedSummOpt = tf.summary.merge_all()
 
 
         ## 设定saver,若有断点,需要回复断点
-        saver = tf.train.Saver(max_to_keep=100)
+        saver = tf.train.Saver()
         ckpt = tf.train.get_checkpoint_state(MODEL_DIR)
         start_it = 1
         if ckpt and ckpt.model_checkpoint_path:
@@ -278,21 +329,23 @@ def train():
             print('Continue training at Iter %d' % start_it)
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
-            print('No training model found, start from iter 1')
+            print('No training model2 found, start from iter 1')
+
         ## 进行训练
         # 训练运行状态参数
         AvgFreq = 0
         Avgloss = 0
 
-
         for iter1 in np.arange(start_it, ITER_NUM + 1):
             startTime = time.time()  # 统计
-            a,b,summary,_,lossData = sess.run([inputBatchTensor,labelBatchTensor,mergedSummOpt,trainOpts,loss])              #训练，注意sess.run 的第一个参数是一个fetch list
-            #summary, _, _, lossData = sess.run([mergedSummOpt, trainOpts, increment_op, loss])  # 训练，注意sess.run 的第一个参数是一个fetch list
+
+            a,b,summary,_,lossData = sess.run([inputTensor, labelTensor,mergedSummOpt,trainOpts, loss])              #训练，注意sess.run 的第一个参数是一个fetch list
+
 
             endTime = time.time()
             AvgFreq += endTime - startTime
             Avgloss += lossData
+
             if (iter1 % SUMMARY_INTERVAL == 0) and (iter1 != 0):                        # 写 sunmmary
                 summWriter.add_summary(summary, iter1)
 
@@ -306,52 +359,10 @@ def train():
                     print(format_str % (datetime.now(), iter1, math.sqrt(Avgloss)*255, AvgFreq))
                 AvgFreq = 0
                 Avgloss = 0
-            if (iter1 % SAVE_INTERVAL == 0) and (iter1 != 0):  # 保存模型与结构等参数 TEST_INTERVAL
-                # test()
-                saver.save(sess, MODEL_DIR + 'model.ckpt', global_step=iter1)
-                print(' ... Iter %d model saved! ' % iter1)
-
-            if (iter1 % VALIDATE_INTERVAL == 0) and (iter1 != 0):                           # 保存模型与结构等参数
-                format_str = '%s: Iters %d, VALIDATION PSNR = %.7f || lr1=%.9f,lr2=%.9f'
-                avgPSNR = 0
-                for imgOri in valSet:
-                    imgOriYUV = cv.cvtColor(imgOri, cv.COLOR_BGR2YCR_CB)
-                    imgOriY = imgOriYUV[:, :, 0]
-                    width = imgOriY.shape[1]
-                    height = imgOriY.shape[0]
-                    flag = False
-                    while height % SCALE != 0:
-                        height -= 1
-                        flag = True
-                    while width % SCALE != 0:
-                        width -= 1
-                        flag = True
-                    if flag:
-                        imgOriY = imgOriY[0:height, 0:width]
-                    lrY = cv.resize(imgOriY, (int(width / SCALE), int(height / SCALE)), interpolation=cv.INTER_CUBIC)
-                    lrY = cv.resize(lrY, (int(width), int(height)), interpolation=cv.INTER_CUBIC)
-                    # 预处理
-                    lrY = lrY.astype(np.float32)
-                    lrY = lrY/255
-                    lrY = np.reshape(lrY, (1,height, width, 1))
-                    resImgY = pred.eval(feed_dict={inputHolder: lrY})
-                    # 后处理
-                    resImgY = np.reshape(resImgY, (height, width, 1))
-                    resImgY = resImgY * 255
-                    resImgY = resImgY.astype(np.uint8)
-                    imgOriY = np.reshape(imgOriY, (height, width, 1))
-                    psnr = tools.PSNR(resImgY, imgOriY)
-                    avgPSNR += psnr
-                
-                
-
-                avgPSNR /= len(valSet)
-                lr1 = sess.run([learning_rate1])
-                lr2 = sess.run([learning_rate2])
-                print(format_str % (datetime.now(), sess.run(globalStep), avgPSNR, lr1[0], lr2[0]))
-
-
-
+            if (iter1 % SAVE_INTERVAL == 0) and (iter1 != 0):                           # 保存模型与结构等参数
+                #testcodes()
+                saver.save(sess, MODEL_DIR + 'model2.ckpt', global_step=iter1)
+                print(' ... Iter %d model2 saved! '%iter1)
 
 if __name__ == '__main__':
         main()

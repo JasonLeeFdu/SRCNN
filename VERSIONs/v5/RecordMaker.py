@@ -33,6 +33,9 @@ def prepareTrainingData(directory,recordName):
         for x in np.arange(0,width-PATCH_SIZE+1,STRIDE):
             for y in np.arange(0,height-PATCH_SIZE+1,STRIDE):
                 subGT_ = imgGT[y:y+PATCH_SIZE,x:x+PATCH_SIZE]
+                #subX_ = cv.resize(subGT_, (int(PATCH_SIZE / SCALE), (int(PATCH_SIZE / SCALE))))
+                #subX_ = cv.resize(subX_, (int(PATCH_SIZE), int(PATCH_SIZE)))
+
                 subX_  = scipy.misc.imresize(subGT_, (int(PATCH_SIZE/SCALE),int(PATCH_SIZE/SCALE)), interp='bicubic', mode='F')
                 subX_  = scipy.misc.imresize(subX_, (PATCH_SIZE, PATCH_SIZE), interp='bicubic', mode='F')
                 # 是否进行数据 augmentation
@@ -107,7 +110,7 @@ def readAndDecode(fileName):
     features = tf.parse_single_example(                         # 序列化的示例数据(训练数据单元).解析为一个含有很多数据项的feature字典{x1:,x2:,...y1:,y2:...}
         serializedExample,
         features={                                              #   解析目标说明
-            'label':tf.FixedLenFeature([],tf.string),           ###$$$  千万注意要要对等tf.string -- tobytes  tostring
+            'label':tf.FixedLenFeature([],tf.string),
             'input':tf.FixedLenFeature([],tf.string)
         }
     )

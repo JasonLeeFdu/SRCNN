@@ -26,7 +26,7 @@ tensorboard支持
 
 
 # hyper parameter
-BATCH_NUM = 7000
+BATCH_NUM = 7200
 ITER_NUM = 800000
 LR1       = 1e-5
 LR2       = 1e-6
@@ -38,9 +38,9 @@ TEST_DATA_PATH = 'Data/dataset/testingSet/'
 TRAIN_RECORD_NAME = 'train.tfrecords'
 VAL_RECORD_NAME = 'val.tfrecords'
 TEST_RECORD_NAME = 'testcodes.tfrecords'
-PRINT_INTERVAL = 20
-SUMMARY_INTERVAL = 10
-SAVE_INTERVAL = 100
+PRINT_INTERVAL = 50
+SUMMARY_INTERVAL = 20
+SAVE_INTERVAL = 200
 MODEL_DIR = 'Data/model2/'
 SCALE = 2
 
