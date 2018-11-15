@@ -53,3 +53,6 @@ with tf.Session() as sess:
 
     #result  = np.reshape(result,newshape=[4,4])
     print(result)
+
+
+
